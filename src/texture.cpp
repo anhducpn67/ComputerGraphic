@@ -9,17 +9,46 @@ namespace CGL {
     Color Texture::sample(const SampleParams &sp) {
         // TODO: Task 6: Fill this in.
         if (sp.psm == P_NEAREST) {
-            return sample_nearest(sp.p_uv, sp.lsm);
+            if (sp.lsm == L_ZERO) {
+                return sample_nearest(sp.p_uv, 0);
+            }
+            float level = get_level(sp);
+            if (sp.lsm == L_NEAREST) {
+                return sample_nearest(sp.p_uv, int(level));
+            }
+            if (sp.lsm == L_LINEAR) {
+                int level1 = int(level);
+                int level2 = int(level) + 1;
+                float weight = level - level1;
+                return (1 - weight)*sample_nearest(sp.p_uv, level1) + weight*sample_nearest(sp.p_uv, level2);
+            }
         }
         if (sp.psm == P_LINEAR) {
-            return sample_bilinear(sp.p_uv, sp.lsm);
+            if (sp.lsm == L_ZERO) {
+                return sample_bilinear(sp.p_uv, 0);
+            }
+            float level = get_level(sp);
+            if (sp.lsm == L_NEAREST) {
+                return sample_bilinear(sp.p_uv, int(level));
+            }
+            if (sp.lsm == L_LINEAR) {
+                int level1 = int(level);
+                int level2 = int(level) + 1;
+                float weight = level - level1;
+                return (1 - weight)*sample_bilinear(sp.p_uv, level1) + weight*sample_bilinear(sp.p_uv, level2);
+            }
         }
     }
 
     float Texture::get_level(const SampleParams &sp) {
         // TODO: Task 6: Fill this in.
-
-        return 0;
+        MipLevel& mip = mipmap[0];
+        Vector2D difference_vectors_x = (sp.p_dx_uv - sp.p_uv) * mip.width;
+        Vector2D difference_vectors_y = (sp.p_dy_uv - sp.p_uv) * mip.height;
+        float L = max(sqrt(difference_vectors_x.x * difference_vectors_x.x + difference_vectors_x.y * difference_vectors_x.y),
+                      sqrt(difference_vectors_y.x * difference_vectors_y.x + difference_vectors_y.y * difference_vectors_y.y));
+        float D = log2(L);
+        return D;
     }
 
     Color MipLevel::get_texel(int tx, int ty) {

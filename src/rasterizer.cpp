@@ -163,11 +163,20 @@ namespace CGL {
         }
     }
 
+    Vector2D convert_to_texture_point(const Vector2D& O,const Vector2D& A, const Vector2D& B, const Vector2D& C,
+                                      const Vector2D& A_texture, const Vector2D& B_texture, const Vector2D& C_texture) {
+        float alpha = L(O, B, C) / L(A, B, C);
+        float beta = L(O, A, C) / L(B, A, C);
+        float gamma = 1 - alpha - beta;
+        return alpha * A_texture + beta * B_texture + gamma * C_texture;
+    }
+
     void RasterizerImp::rasterize_textured_triangle(float x0, float y0, float u0, float v0,
                                                     float x1, float y1, float u1, float v1,
                                                     float x2, float y2, float u2, float v2,
                                                     Texture &tex) {
         // TODO: Task 5: Fill in the SampleParams struct and pass it to the tex.sample function.
+        // TODO: Task 6: Set the correct barycentric differentials in the SampleParams struct.
         if (!ccw(ii(x0, y0), ii(x1, y1), ii(x2, y2))) {
             swap(x1, x2);
             swap(u1, u2);
@@ -187,23 +196,19 @@ namespace CGL {
                     for (int i_y = 0; i_y < scale; i_y++) {
                         float center_x = x + i_x * (1.0 / scale) + 1.0 / (2 * scale);
                         float center_y = y + i_y * (1.0 / scale) + 1.0 / (2 * scale);
-                        Vector2D O(center_x, center_y);
                         if (inside_triangle(center_x, center_y, x0, y0, x1, y1, x2, y2)) {
-                            int k = i_x * scale + i_y;
-                            float alpha = L(O, B, C) / L(A, B, C);
-                            float beta = L(O, A, C) / L(B, A, C);
-                            float gamma = 1 - alpha - beta;
-                            Vector2D O_texture = alpha * A_texture + beta * B_texture + gamma * C_texture;
+                            Vector2D O(center_x, center_y);
                             SampleParams sp;
-                            sp.p_uv = O_texture; sp.lsm = this->lsm; sp.psm = this->psm;
+                            sp.p_uv = convert_to_texture_point(O, A, B, C, A_texture, B_texture, C_texture);
+                            sp.p_dx_uv = convert_to_texture_point(O + Vector2D(1, 0), A, B, C, A_texture, B_texture, C_texture);
+                            sp.p_dy_uv = convert_to_texture_point(O + Vector2D(0, 1), A, B, C, A_texture, B_texture, C_texture);
+                            sp.lsm = this->lsm; sp.psm = this->psm;
+                            int k = i_x * scale + i_y;
                             sample_buffer[(y * width + x) * sample_rate + k] = tex.sample(sp);
                         }
                     }
             }
         }
-        // TODO: Task 6: Set the correct barycentric differentials in the SampleParams struct.
-        // Hint: You can reuse code from rasterize_triangle/rasterize_interpolated_color_triangle
-
     }
 
     void RasterizerImp::set_sample_rate(unsigned int rate) {
