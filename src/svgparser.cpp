@@ -14,512 +14,535 @@
 
 using namespace std;
 
-namespace CGL { 
+namespace CGL {
 
-SVG *SVGParser::curr_svg;
-string SVGParser::dir;
+    SVG *SVGParser::curr_svg;
+    string SVGParser::dir;
 
 // Parser //
 
-int SVGParser::load( const char* filename, SVG* svg ) {
+    int SVGParser::load(const char *filename, SVG *svg) {
 
-  ifstream in( filename );
-  if( !in.is_open() ) {
-     return -1;
-  }
-  in.close();
+        ifstream in(filename);
+        if (!in.is_open()) {
+            return -1;
+        }
+        in.close();
 
-  //string path(realpath(filename,NULL));
-  string path = resolve_path(filename);
-  dir = path.substr(0,path.find_last_of("/\\")) + "/";
+        //string path(realpath(filename,NULL));
+        string path = resolve_path(filename);
+        dir = path.substr(0, path.find_last_of("/\\")) + "/";
 
-  XMLDocument doc;
-  doc.LoadFile( filename );
-  if( doc.Error() ) {
-     doc.PrintError();
-     exit( 1 );
-  }
+        XMLDocument doc;
+        doc.LoadFile(filename);
+        if (doc.Error()) {
+            doc.PrintError();
+            exit(1);
+        }
 
-  XMLElement* root = doc.FirstChildElement( "svg" );
-  if( !root ) {
-     cerr << "Error: not an SVG file!" << endl;
-     exit( 1 );
-  }
+        XMLElement *root = doc.FirstChildElement("svg");
+        if (!root) {
+            cerr << "Error: not an SVG file!" << endl;
+            exit(1);
+        }
 
-  root->QueryFloatAttribute( "width",  &svg->width  );
-  root->QueryFloatAttribute( "height", &svg->height );
+        root->QueryFloatAttribute("width", &svg->width);
+        root->QueryFloatAttribute("height", &svg->height);
 
-  curr_svg = svg;
-  parseSVG( root, svg );
+        curr_svg = svg;
+        parseSVG(root, svg);
 
-  return 0;
-}
-
-void SVGParser::parseSVG( XMLElement* xml, SVG* svg ) {
-
-  /* NOTE (sky):
-   * SVG uses a "painters model" when drawing elements. Elements 
-   * that appear later in the document are drawn after (on top of) 
-   * elements that appear earlier in the document. The parser loads
-   * elements in the same order and the renderer should respect this
-   * order when drawing elements.
-   */
-
-  XMLElement* elem = xml->FirstChildElement();
-  while( elem ) {
-
-    string elementType ( elem->Value() );
-    if( elementType == "line" ) {
-
-      Line* line = new Line();
-      parseElement(elem, line );
-      parseLine( elem, line );
-      svg->elements.push_back( line );
-
-    } else if( elementType == "polyline" ) {
-
-      Polyline* polyline = new Polyline();
-      parseElement(elem, polyline );
-      parsePolyline( elem, polyline );
-      svg->elements.push_back( polyline );
-
-    } else if( elementType == "rect" ) {
-
-      float w = elem->FloatAttribute("width" );
-      float h = elem->FloatAttribute("height");
-
-      // treat zero-size rectangles as points
-      if (w == 0 && h == 0) {
-        Point* point = new Point();
-        parseElement(elem, point );
-        parsePoint( elem, point );
-        svg->elements.push_back( point );
-      } else {
-        Rect* rect = new Rect();
-        parseElement( elem, rect );
-        parseRect( elem, rect );
-        svg->elements.push_back( rect );
-      }
-
-    } else if( elementType == "polygon" ) {
-
-      Polygon* polygon = new Polygon();
-      parseElement( elem, polygon);
-      parsePolygon( elem, polygon );
-      svg->elements.push_back( polygon );
-
-    } else if ( elementType == "image" ) {
-
-      Image* image = new Image();
-      parseElement( elem, image);
-      parseImage( elem, image);
-      svg->elements.push_back( image ); 
-
-    } else if( elementType == "g" ) {
-
-       Group* group = new Group();
-       parseElement( elem, group);
-       parseGroup( elem, group );
-       svg->elements.push_back( group );
-
-    } else if ( elementType == "colortri" ) {
-
-      InterpolatedColorTriangle* ctri = new InterpolatedColorTriangle();
-      parseElement( elem, ctri);
-      parseColorTri( elem, ctri);
-      svg->elements.push_back( ctri ); 
-
-    } else if ( elementType == "textri" ) {
-
-      TexturedTriangle* ttri = new TexturedTriangle();
-      parseElement( elem, ttri);
-      parseTexTri( elem, ttri);
-      svg->elements.push_back( ttri ); 
-
-    } else if ( elementType == "texture" ) {
-
-      parseTexture( elem );
-
-    } else {
-       // unknown element type --- include default handler here if desired
+        return 0;
     }
 
-    elem = elem->NextSiblingElement();
-  }
-}
+    void SVGParser::parseSVG(XMLElement *xml, SVG *svg) {
 
-void SVGParser::parseElement( XMLElement* xml, SVGElement* element ) {
+        /* NOTE (sky):
+         * SVG uses a "painters model" when drawing elements. Elements
+         * that appear later in the document are drawn after (on top of)
+         * elements that appear earlier in the document. The parser loads
+         * elements in the same order and the renderer should respect this
+         * order when drawing elements.
+         */
 
-  // parse style
-  Style* style = &element->style;
-  const char* fill = xml->Attribute( "fill" );
-  if( fill ) style->fillColor = Color::fromHex( fill );
+        XMLElement *elem = xml->FirstChildElement();
+        while (elem) {
 
-  //const char* fill_opacity = xml->Attribute( "fill-opacity" );
-  //if( fill_opacity ) style->fillColor.a = atof( fill_opacity );
+            string elementType(elem->Value());
+            if (elementType == "line") {
 
-  const char* stroke = xml->Attribute( "stroke" );
-  //const char* stroke_opacity = xml->Attribute( "stroke-opacity" );
-  if( stroke ) {
-    style->strokeColor = Color::fromHex( stroke );
-    style->strokeVisible = true;
-    //if( stroke_opacity ) style->strokeColor.a = atof( stroke_opacity );
-  } else {
-    style->strokeColor = Color::Black;
-    style->strokeVisible = false;
-    //style->strokeColor.a = 0;
-  }
+                Line *line = new Line();
+                parseElement(elem, line);
+                parseLine(elem, line);
+                svg->elements.push_back(line);
 
+            } else if (elementType == "polyline") {
 
-  xml->QueryFloatAttribute( "stroke-width",      &style->strokeWidth );
-  xml->QueryFloatAttribute( "stroke-miterlimit", &style->miterLimit  );
+                Polyline *polyline = new Polyline();
+                parseElement(elem, polyline);
+                parsePolyline(elem, polyline);
+                svg->elements.push_back(polyline);
 
-  // parse transformation
-  const char* trans = xml->Attribute( "transform" );
-  if ( trans ) {
-    
-    // NOTE (sky):
-    // This implements the SVG transformation specification. All the SVG 
-    // transformations are supported as documented in the link below:
-    // https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/transform
+            } else if (elementType == "rect") {
 
-    // consolidate transformation
-    Matrix3x3 transform;
+                float w = elem->FloatAttribute("width");
+                float h = elem->FloatAttribute("height");
 
-    string trans_str = trans; size_t paren_l, paren_r;
-    while ( trans_str.find_first_of('(') != string::npos ) {
+                // treat zero-size rectangles as points
+                if (w == 0 && h == 0) {
+                    Point *point = new Point();
+                    parseElement(elem, point);
+                    parsePoint(elem, point);
+                    svg->elements.push_back(point);
+                } else {
+                    Rect *rect = new Rect();
+                    parseElement(elem, rect);
+                    parseRect(elem, rect);
+                    svg->elements.push_back(rect);
+                }
 
-      paren_l = trans_str.find_first_of('(');
-      paren_r = trans_str.find_first_of(')');
+            } else if (elementType == "polygon") {
 
-      string type = trans_str.substr(0, paren_l);
-      string data = trans_str.substr(paren_l + 1, paren_r - paren_l - 1);
+                Polygon *polygon = new Polygon();
+                parseElement(elem, polygon);
+                parsePolygon(elem, polygon);
+                svg->elements.push_back(polygon);
 
-      Matrix3x3 m;
+            } else if (elementType == "image") {
 
-      if ( type == "matrix" ) {
-        
-        string matrix_str = data;
-        replace( matrix_str.begin(), matrix_str.end(), ',', ' ');
+                Image *image = new Image();
+                parseElement(elem, image);
+                parseImage(elem, image);
+                svg->elements.push_back(image);
 
-        stringstream ss (matrix_str);
-        float a,   b,   c,   d,   e,   f;
-        ss >> a >> b >> c >> d >> e >> f;
+            } else if (elementType == "g") {
 
-        m = Matrix3x3(a,c,e,  
-                      b,d,f, 
-                      0,0,1);      
-      
-      } else if ( type == "translate" ) {
-        
-        stringstream ss (data);
-        float x; if (!(ss >> x)) x = 0;
-        float y; if (!(ss >> y)) y = 0;
-        
-        m = translate(x,y);
+                Group *group = new Group();
+                parseElement(elem, group);
+                parseGroup(elem, group);
+                svg->elements.push_back(group);
 
-      } else if (type == "scale" ) {
+            } else if (elementType == "colortri") {
 
-        stringstream ss (data);
-        float x; if (!(ss >> x)) x = 1;
-        float y; if (!(ss >> y)) y = 1;
-        
-        m = scale(x,y);
+                InterpolatedColorTriangle *ctri = new InterpolatedColorTriangle();
+                parseElement(elem, ctri);
+                parseColorTri(elem, ctri);
+                svg->elements.push_back(ctri);
 
-      } else if (type == "rotate") {
+            } else if (elementType == "textri") {
 
-        stringstream ss (data);
-        float a; if (!(ss >> a)) a = 0;
-        float x; if (!(ss >> x)) x = 0;
-        float y; if (!(ss >> y)) y = 0;
+                TexturedTriangle *ttri = new TexturedTriangle();
+                parseElement(elem, ttri);
+                parseTexTri(elem, ttri);
+                svg->elements.push_back(ttri);
 
-        m = translate(x,y) * rotate(a) * translate(-x,-y);
-        
-      } else if (type == "skewX" ) {
+            } else if (elementType == "texture") {
 
-        stringstream ss (data);
-        float a; ss >> a;
+                parseTexture(elem);
 
-        m(0,1) = tan(a*PI/180.0f);
+            } else {
+                // unknown element type --- include default handler here if desired
+            }
 
-      } else if (type == "skewY" ) {
-
-        stringstream ss (data);
-        float a; ss >> a;
-        
-        m(1,0) = tan(a*PI/180.0f);
-
-      } else {
-        cerr << "unknown transformation type: " << type << endl;
-      }
-
-      transform = transform * m;
-      size_t end = paren_r + 2;
-      trans_str.erase(0, end);
+            elem = elem->NextSiblingElement();
+        }
     }
 
-    element->transform = transform;
-  }
-}   
+    void SVGParser::parseElement(XMLElement *xml, SVGElement *element) {
 
-void SVGParser::parseTexture( XMLElement* xml ) {
-  string texid = xml->Attribute("texid");
+        // parse style
+        Style *style = &element->style;
+        const char *fill = xml->Attribute("fill");
+        if (fill) style->fillColor = Color::fromHex(fill);
 
-  const char* file = xml->Attribute( "filename" );
-  vector<unsigned char> pixels;
-  unsigned int width, height;
-  int err = lodepng::decode(pixels, width, height, dir + string(file));
-  if (err) {
-    cerr << " could not load image " << file << endl;
-    return;
-  }
+        //const char* fill_opacity = xml->Attribute( "fill-opacity" );
+        //if( fill_opacity ) style->fillColor.a = atof( fill_opacity );
 
-  // Strip the alpha channel
-  vector<unsigned char> pixels_no_alpha;
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      for (int k = 0; k < 3; ++k) {
-        pixels_no_alpha.push_back(pixels[4 * (y * width + x) + k]);
-      }
+        const char *stroke = xml->Attribute("stroke");
+        //const char* stroke_opacity = xml->Attribute( "stroke-opacity" );
+        if (stroke) {
+            style->strokeColor = Color::fromHex(stroke);
+            style->strokeVisible = true;
+            //if( stroke_opacity ) style->strokeColor.a = atof( stroke_opacity );
+        } else {
+            style->strokeColor = Color::Black;
+            style->strokeVisible = false;
+            //style->strokeColor.a = 0;
+        }
+
+
+        xml->QueryFloatAttribute("stroke-width", &style->strokeWidth);
+        xml->QueryFloatAttribute("stroke-miterlimit", &style->miterLimit);
+
+        // parse transformation
+        const char *trans = xml->Attribute("transform");
+        if (trans) {
+
+            // NOTE (sky):
+            // This implements the SVG transformation specification. All the SVG
+            // transformations are supported as documented in the link below:
+            // https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/transform
+
+            // consolidate transformation
+            Matrix3x3 transform;
+
+            string trans_str = trans;
+            size_t paren_l, paren_r;
+            while (trans_str.find_first_of('(') != string::npos) {
+
+                paren_l = trans_str.find_first_of('(');
+                paren_r = trans_str.find_first_of(')');
+
+                string type = trans_str.substr(0, paren_l);
+                string data = trans_str.substr(paren_l + 1, paren_r - paren_l - 1);
+
+                Matrix3x3 m;
+
+                if (type == "matrix") {
+
+                    string matrix_str = data;
+                    replace(matrix_str.begin(), matrix_str.end(), ',', ' ');
+
+                    stringstream ss(matrix_str);
+                    float a, b, c, d, e, f;
+                    ss >> a >> b >> c >> d >> e >> f;
+
+                    m = Matrix3x3(a, c, e,
+                                  b, d, f,
+                                  0, 0, 1);
+
+                } else if (type == "translate") {
+
+                    stringstream ss(data);
+                    float x;
+                    if (!(ss >> x)) x = 0;
+                    float y;
+                    if (!(ss >> y)) y = 0;
+
+                    m = translate(x, y);
+
+                } else if (type == "scale") {
+
+                    stringstream ss(data);
+                    float x;
+                    if (!(ss >> x)) x = 1;
+                    float y;
+                    if (!(ss >> y)) y = 1;
+
+                    m = scale(x, y);
+
+                } else if (type == "rotate") {
+
+                    stringstream ss(data);
+                    float a;
+                    if (!(ss >> a)) a = 0;
+                    float x;
+                    if (!(ss >> x)) x = 0;
+                    float y;
+                    if (!(ss >> y)) y = 0;
+
+                    m = translate(x, y) * rotate(a) * translate(-x, -y);
+
+                } else if (type == "skewX") {
+
+                    stringstream ss(data);
+                    float a;
+                    ss >> a;
+
+                    m(0, 1) = tan(a * PI / 180.0f);
+
+                } else if (type == "skewY") {
+
+                    stringstream ss(data);
+                    float a;
+                    ss >> a;
+
+                    m(1, 0) = tan(a * PI / 180.0f);
+
+                } else {
+                    cerr << "unknown transformation type: " << type << endl;
+                }
+
+                transform = transform * m;
+                size_t end = paren_r + 2;
+                trans_str.erase(0, end);
+            }
+
+            element->transform = transform;
+        }
     }
-  }
 
-  Texture *tex = new Texture();
-  tex->init(pixels_no_alpha, width, height);
-  curr_svg->textures[texid] = tex;
+    void SVGParser::parseTexture(XMLElement *xml) {
+        string texid = xml->Attribute("texid");
 
-}
+        const char *file = xml->Attribute("filename");
+        vector<unsigned char> pixels;
+        unsigned int width, height;
+        int err = lodepng::decode(pixels, width, height, dir + string(file));
+        if (err) {
+            cerr << " could not load image " << file << endl;
+            return;
+        }
 
+        // Strip the alpha channel
+        vector<unsigned char> pixels_no_alpha;
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < width; ++x) {
+                for (int k = 0; k < 3; ++k) {
+                    pixels_no_alpha.push_back(pixels[4 * (y * width + x) + k]);
+                }
+            }
+        }
 
-void SVGParser::parsePoint( XMLElement* xml, Point* point ) {
-  point->position = Vector2D(xml->FloatAttribute( "x" ),
-                             xml->FloatAttribute( "y" ));
-}
+        Texture *tex = new Texture();
+        tex->init(pixels_no_alpha, width, height);
+        curr_svg->textures[texid] = tex;
 
-void SVGParser::parseLine( XMLElement* xml, Line* line ) {
-  line->from = Vector2D(xml->FloatAttribute( "x1" ),
-                        xml->FloatAttribute( "y1" ));
-  line->to   = Vector2D(xml->FloatAttribute( "x2" ),
-                        xml->FloatAttribute( "y2" ));
-}
-
-void SVGParser::parsePolyline( XMLElement* xml, Polyline* polyline ) {
-
-  stringstream points (xml->Attribute( "points" ));
-
-  float x, y;
-  char c;
-
-  while( points >> x >> c >> y ) {
-     polyline->points.push_back( Vector2D( x, y ) );
-  }
-}
-
-void SVGParser::parseRect( XMLElement* xml, Rect* rect ) {
-  rect->position  = Vector2D(xml->FloatAttribute( "x" ),
-                             xml->FloatAttribute( "y" ));
-  rect->dimension = Vector2D(xml->FloatAttribute( "width"  ),
-                             xml->FloatAttribute( "height" ));
-}
-
-void SVGParser::parsePolygon( XMLElement* xml, Polygon* polygon ) {
-
-  stringstream points (xml->Attribute( "points" ));
-
-  float x, y;
-  char c;
-
-  while( points >> x >> c >> y ) {
-     polygon->points.push_back( Vector2D( x, y ) );
-  }
-}
-
-void SVGParser::parseImage( XMLElement* xml, Image* image ) {
-  image->position  = Vector2D ( xml->FloatAttribute( "x" ),
-                                xml->FloatAttribute( "y" ));
-  image->dimension = Vector2D ( xml->FloatAttribute( "width"  ),
-                                xml->FloatAttribute( "height" )); 
-
-  // read png data
-  const char* data = xml->Attribute( "xlink:href" );
-  while (*data != ',') data++; data++;
-  
-  // decode base64 encoded data
-  string encoded = data;
-  encoded.erase(remove(encoded.begin(), encoded.end(), ' ' ), encoded.end());
-  encoded.erase(remove(encoded.begin(), encoded.end(), '\t'), encoded.end());
-  encoded.erase(remove(encoded.begin(), encoded.end(), '\n'), encoded.end());
-  string decoded = base64_decode(encoded);
-
-  // load decoded data into buffer
-  const unsigned char* buffer = (unsigned char*) decoded.c_str(); 
-  size_t size = decoded.size();
-
-  vector<unsigned char> pixels;
-  unsigned int width, height;
-  int err = lodepng::decode(pixels, width, height, buffer, size);
-  if (err) {
-    cerr << " could not load image " << endl;
-    return;
-  }
-  // load into png
-  // PNG png; PNGParser::load(buffer, size, png);
-  
-  // Strip the alpha channel
-  vector<unsigned char> pixels_no_alpha;
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      for (int k = 0; k < 3; ++k) {
-        pixels_no_alpha.push_back(pixels[4 * (y * width + x) + k]);
-      }
     }
-  }
-  
-  // create bitmap texture from png (mip level 0)
-  MipLevel mip_start;
-  mip_start.width  = width;
-  mip_start.height = height;
-  mip_start.texels = pixels_no_alpha;
 
-  // add to svg
-  image->tex.width  = mip_start.width;
-  image->tex.height = mip_start.height;
-  image->tex.mipmap.push_back(mip_start);
-}
 
-void SVGParser::parseGroup( XMLElement* xml, Group* group ) {
+    void SVGParser::parsePoint(XMLElement *xml, Point *point) {
+        point->position = Vector2D(xml->FloatAttribute("x"),
+                                   xml->FloatAttribute("y"));
+    }
 
-  /* NOTE (sky):
-   * A group contains a list of elements, and optionally a transformation
-   * to apply to all the elements it contains. Elements in a group follow
-   * the same draw order as elements in a svg (top to bottom).  
-   * A group should be considered as one single element outside its scope.
-   * This means at draw time, all elements in a group should be drawn before 
-   * elements outside the group. All elements in the group inherits the group
-   * transformation, and keep in mind that transformation is accumulative.
-   * Groups can also be nested.  
-   */
-  XMLElement* elem = xml->FirstChildElement();
-  while( elem ) {
+    void SVGParser::parseLine(XMLElement *xml, Line *line) {
+        line->from = Vector2D(xml->FloatAttribute("x1"),
+                              xml->FloatAttribute("y1"));
+        line->to = Vector2D(xml->FloatAttribute("x2"),
+                            xml->FloatAttribute("y2"));
+    }
 
-    string elementType ( elem->Value() );
-    if( elementType == "line" ) {
+    void SVGParser::parsePolyline(XMLElement *xml, Polyline *polyline) {
 
-      Line* line = new Line();
-      parseElement( elem, line );
-      parseLine( elem, line );
-      group->elements.push_back( line );
-    
-    } else if( elementType == "polyline" ) {
+        stringstream points(xml->Attribute("points"));
 
-      Polyline* polyline = new Polyline();
-      parseElement( elem, polyline );
-      parsePolyline( elem, polyline );
-      group->elements.push_back( polyline );
+        float x, y;
+        char c;
 
-    } else if( elementType == "rect" ) {
+        while (points >> x >> c >> y) {
+            polyline->points.push_back(Vector2D(x, y));
+        }
+    }
 
-      float w = elem->FloatAttribute("width" );
-      float h = elem->FloatAttribute("height");
+    void SVGParser::parseRect(XMLElement *xml, Rect *rect) {
+        rect->position = Vector2D(xml->FloatAttribute("x"),
+                                  xml->FloatAttribute("y"));
+        rect->dimension = Vector2D(xml->FloatAttribute("width"),
+                                   xml->FloatAttribute("height"));
+    }
 
-      // treat zero-size rectangles as points
-      if (w == 0 && h == 0) {
-        Point* point = new Point();
-        parseElement( elem, point );
-        parsePoint( elem, point );
-        group->elements.push_back( point );
-      } else {
-        Rect* rect = new Rect();
-        parseElement( elem, rect );
-        parseRect( elem, rect );
-        group->elements.push_back( rect );
-      }
+    void SVGParser::parsePolygon(XMLElement *xml, Polygon *polygon) {
 
-    } else if( elementType == "polygon" ) {
-    
-      Polygon* polygon = new Polygon();
-      parseElement( elem, polygon );
-      parsePolygon( elem, polygon );
-      group->elements.push_back( polygon );
+        stringstream points(xml->Attribute("points"));
 
-    } else if ( elementType == "image" ) {
-    
-      Image* image = new Image();
-      parseElement( elem, image );
-      parseImage( elem, image);
-      group->elements.push_back( image ); 
-    
-    } else if( elementType == "g" ) {
-    
-       Group* sub_group = new Group();
-       parseElement( elem, sub_group );
-       parseGroup( elem, sub_group );
-       group->elements.push_back( sub_group );
-    
-    } else if ( elementType == "colortri" ) {
+        float x, y;
+        char c;
 
-      InterpolatedColorTriangle* ctri = new InterpolatedColorTriangle();
-      parseElement( elem, ctri);
-      parseColorTri( elem, ctri);
-      group->elements.push_back( ctri ); 
+        while (points >> x >> c >> y) {
+            polygon->points.push_back(Vector2D(x, y));
+        }
+    }
 
-    } else if ( elementType == "textri" ) {
+    void SVGParser::parseImage(XMLElement *xml, Image *image) {
+        image->position = Vector2D(xml->FloatAttribute("x"),
+                                   xml->FloatAttribute("y"));
+        image->dimension = Vector2D(xml->FloatAttribute("width"),
+                                    xml->FloatAttribute("height"));
 
-      TexturedTriangle* ttri = new TexturedTriangle();
-      parseElement( elem, ttri);
-      parseTexTri( elem, ttri);
-      group->elements.push_back( ttri ); 
+        // read png data
+        const char *data = xml->Attribute("xlink:href");
+        while (*data != ',') data++;
+        data++;
 
-    } else if ( elementType == "texture" ) {
+        // decode base64 encoded data
+        string encoded = data;
+        encoded.erase(remove(encoded.begin(), encoded.end(), ' '), encoded.end());
+        encoded.erase(remove(encoded.begin(), encoded.end(), '\t'), encoded.end());
+        encoded.erase(remove(encoded.begin(), encoded.end(), '\n'), encoded.end());
+        string decoded = base64_decode(encoded);
 
-      parseTexture( elem );
+        // load decoded data into buffer
+        const unsigned char *buffer = (unsigned char *) decoded.c_str();
+        size_t size = decoded.size();
 
-    } else {
-       // unknown element type --- include default handler here if desired
-    }    
-    elem = elem->NextSiblingElement();
-  }
-}
+        vector<unsigned char> pixels;
+        unsigned int width, height;
+        int err = lodepng::decode(pixels, width, height, buffer, size);
+        if (err) {
+            cerr << " could not load image " << endl;
+            return;
+        }
+        // load into png
+        // PNG png; PNGParser::load(buffer, size, png);
 
-void SVGParser::parseColorTri( XMLElement* xml, InterpolatedColorTriangle* ctri ) {
+        // Strip the alpha channel
+        vector<unsigned char> pixels_no_alpha;
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < width; ++x) {
+                for (int k = 0; k < 3; ++k) {
+                    pixels_no_alpha.push_back(pixels[4 * (y * width + x) + k]);
+                }
+            }
+        }
 
-  stringstream points (xml->Attribute( "points" ));
+        // create bitmap texture from png (mip level 0)
+        MipLevel mip_start;
+        mip_start.width = width;
+        mip_start.height = height;
+        mip_start.texels = pixels_no_alpha;
 
-  float x, y;
-  points >> x >> y; ctri->p0_svg = Vector2D(x,y);
-  points >> x >> y; ctri->p1_svg = Vector2D(x,y);
-  points >> x >> y; ctri->p2_svg = Vector2D(x,y);
+        // add to svg
+        image->tex.width = mip_start.width;
+        image->tex.height = mip_start.height;
+        image->tex.mipmap.push_back(mip_start);
+    }
 
-  stringstream colors (xml->Attribute( "colors" ));
+    void SVGParser::parseGroup(XMLElement *xml, Group *group) {
 
-  float r,g,b,a;
-  // Alpha removed
-  colors >> r >> g >> b >> a; ctri->p0_col = Color(r,g,b);
-  colors >> r >> g >> b >> a; ctri->p1_col = Color(r,g,b);
-  colors >> r >> g >> b >> a; ctri->p2_col = Color(r,g,b);
+        /* NOTE (sky):
+         * A group contains a list of elements, and optionally a transformation
+         * to apply to all the elements it contains. Elements in a group follow
+         * the same draw order as elements in a svg (top to bottom).
+         * A group should be considered as one single element outside its scope.
+         * This means at draw time, all elements in a group should be drawn before
+         * elements outside the group. All elements in the group inherits the group
+         * transformation, and keep in mind that transformation is accumulative.
+         * Groups can also be nested.
+         */
+        XMLElement *elem = xml->FirstChildElement();
+        while (elem) {
 
-}
+            string elementType(elem->Value());
+            if (elementType == "line") {
 
-void SVGParser::parseTexTri( XMLElement* xml, TexturedTriangle* ttri ) {
+                Line *line = new Line();
+                parseElement(elem, line);
+                parseLine(elem, line);
+                group->elements.push_back(line);
 
-  stringstream points (xml->Attribute( "points" ));
+            } else if (elementType == "polyline") {
 
-  float x, y;
-  points >> x >> y; ttri->p0_svg = Vector2D(x,y);
-  points >> x >> y; ttri->p1_svg = Vector2D(x,y);
-  points >> x >> y; ttri->p2_svg = Vector2D(x,y);
+                Polyline *polyline = new Polyline();
+                parseElement(elem, polyline);
+                parsePolyline(elem, polyline);
+                group->elements.push_back(polyline);
 
-  stringstream uvs (xml->Attribute( "uvs" ));
+            } else if (elementType == "rect") {
 
-  uvs >> x >> y; ttri->p0_uv = Vector2D(x,y);
-  uvs >> x >> y; ttri->p1_uv = Vector2D(x,y);
-  uvs >> x >> y; ttri->p2_uv = Vector2D(x,y);
+                float w = elem->FloatAttribute("width");
+                float h = elem->FloatAttribute("height");
 
-  // read png data
-  string texid = xml->Attribute( "texid" );
+                // treat zero-size rectangles as points
+                if (w == 0 && h == 0) {
+                    Point *point = new Point();
+                    parseElement(elem, point);
+                    parsePoint(elem, point);
+                    group->elements.push_back(point);
+                } else {
+                    Rect *rect = new Rect();
+                    parseElement(elem, rect);
+                    parseRect(elem, rect);
+                    group->elements.push_back(rect);
+                }
 
-  ttri->tex = curr_svg->textures[texid];
-  
-}
+            } else if (elementType == "polygon") {
+
+                Polygon *polygon = new Polygon();
+                parseElement(elem, polygon);
+                parsePolygon(elem, polygon);
+                group->elements.push_back(polygon);
+
+            } else if (elementType == "image") {
+
+                Image *image = new Image();
+                parseElement(elem, image);
+                parseImage(elem, image);
+                group->elements.push_back(image);
+
+            } else if (elementType == "g") {
+
+                Group *sub_group = new Group();
+                parseElement(elem, sub_group);
+                parseGroup(elem, sub_group);
+                group->elements.push_back(sub_group);
+
+            } else if (elementType == "colortri") {
+
+                InterpolatedColorTriangle *ctri = new InterpolatedColorTriangle();
+                parseElement(elem, ctri);
+                parseColorTri(elem, ctri);
+                group->elements.push_back(ctri);
+
+            } else if (elementType == "textri") {
+
+                TexturedTriangle *ttri = new TexturedTriangle();
+                parseElement(elem, ttri);
+                parseTexTri(elem, ttri);
+                group->elements.push_back(ttri);
+
+            } else if (elementType == "texture") {
+
+                parseTexture(elem);
+
+            } else {
+                // unknown element type --- include default handler here if desired
+            }
+            elem = elem->NextSiblingElement();
+        }
+    }
+
+    void SVGParser::parseColorTri(XMLElement *xml, InterpolatedColorTriangle *ctri) {
+
+        stringstream points(xml->Attribute("points"));
+
+        float x, y;
+        points >> x >> y;
+        ctri->p0_svg = Vector2D(x, y);
+        points >> x >> y;
+        ctri->p1_svg = Vector2D(x, y);
+        points >> x >> y;
+        ctri->p2_svg = Vector2D(x, y);
+
+        stringstream colors(xml->Attribute("colors"));
+
+        float r, g, b, a;
+        // Alpha removed
+        colors >> r >> g >> b >> a;
+        ctri->p0_col = Color(r, g, b);
+        colors >> r >> g >> b >> a;
+        ctri->p1_col = Color(r, g, b);
+        colors >> r >> g >> b >> a;
+        ctri->p2_col = Color(r, g, b);
+
+    }
+
+    void SVGParser::parseTexTri(XMLElement *xml, TexturedTriangle *ttri) {
+
+        stringstream points(xml->Attribute("points"));
+
+        float x, y;
+        points >> x >> y;
+        ttri->p0_svg = Vector2D(x, y);
+        points >> x >> y;
+        ttri->p1_svg = Vector2D(x, y);
+        points >> x >> y;
+        ttri->p2_svg = Vector2D(x, y);
+
+        stringstream uvs(xml->Attribute("uvs"));
+
+        uvs >> x >> y;
+        ttri->p0_uv = Vector2D(x, y);
+        uvs >> x >> y;
+        ttri->p1_uv = Vector2D(x, y);
+        uvs >> x >> y;
+        ttri->p2_uv = Vector2D(x, y);
+
+        // read png data
+        string texid = xml->Attribute("texid");
+
+        ttri->tex = curr_svg->textures[texid];
+
+    }
 
 }
