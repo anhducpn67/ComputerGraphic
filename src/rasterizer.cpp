@@ -167,7 +167,7 @@ namespace CGL {
                                                     float x1, float y1, float u1, float v1,
                                                     float x2, float y2, float u2, float v2,
                                                     Texture &tex) {
-//        // TODO: Task 5: Fill in the SampleParams struct and pass it to the tex.sample function.
+        // TODO: Task 5: Fill in the SampleParams struct and pass it to the tex.sample function.
         if (!ccw(ii(x0, y0), ii(x1, y1), ii(x2, y2))) {
             swap(x1, x2);
             swap(u1, u2);
@@ -194,7 +194,9 @@ namespace CGL {
                             float beta = L(O, A, C) / L(B, A, C);
                             float gamma = 1 - alpha - beta;
                             Vector2D O_texture = alpha * A_texture + beta * B_texture + gamma * C_texture;
-                            sample_buffer[(y * width + x) * sample_rate + k] = tex.sample_nearest(O_texture);
+                            SampleParams sp;
+                            sp.p_uv = O_texture; sp.lsm = this->lsm; sp.psm = this->psm;
+                            sample_buffer[(y * width + x) * sample_rate + k] = tex.sample(sp);
                         }
                     }
             }

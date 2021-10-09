@@ -8,10 +8,12 @@ namespace CGL {
 
     Color Texture::sample(const SampleParams &sp) {
         // TODO: Task 6: Fill this in.
-
-
-// return magenta for invalid level
-        return Color(1, 0, 1);
+        if (sp.psm == P_NEAREST) {
+            return sample_nearest(sp.p_uv, sp.lsm);
+        }
+        if (sp.psm == P_LINEAR) {
+            return sample_bilinear(sp.p_uv, sp.lsm);
+        }
     }
 
     float Texture::get_level(const SampleParams &sp) {
@@ -29,19 +31,76 @@ namespace CGL {
         auto &mip = mipmap[level];
         int tx = int(uv.x * mip.width);
         int ty = int(uv.y * mip.height);
-        //11.89
         return mip.get_texel(tx, ty);
     }
 
     Color Texture::sample_bilinear(Vector2D uv, int level) {
         // TODO: Task 5: Fill this in.
         auto &mip = mipmap[level];
-
-        // return magenta for invalid level
-        return Color(1, 0, 1);
+        float real_u = uv.x * mip.width;
+        float real_v = uv.y * mip.height;
+        int tx = int(real_u);
+        int ty = int(real_v);
+        if (tx == 0 || ty == 0 || tx == mip.width - 1 || ty == mip.height - 1) {
+            return mip.get_texel(tx, ty);
+        }
+        /* Find 4 nearest neighbor */
+        Vector2D bottom_left, bottom_right, top_left, top_right;
+        int area_col = (real_u - 1.0 * tx > 0.5);
+        int area_row = (real_v - 1.0 * ty > 0.5);
+        if (area_row == 0 && area_col == 0) {
+            bottom_left.x = tx - 1;
+            bottom_left.y = ty;
+            bottom_right.x = tx;
+            bottom_right.y = ty;
+            top_left.x = tx - 1;
+            top_left.y = ty - 1;
+            top_right.x = tx;
+            top_right.y = ty - 1;
+        }
+        if (area_row == 0 && area_col == 1) {
+            bottom_left.x = tx;
+            bottom_left.y = ty;
+            bottom_right.x = tx + 1;
+            bottom_right.y = ty;
+            top_left.x = tx;
+            top_left.y = ty - 1;
+            top_right.x = tx + 1;
+            top_right.y = ty - 1;
+        }
+        if (area_row == 1 && area_col == 0) {
+            bottom_left.x = tx - 1;
+            bottom_left.y = ty + 1;
+            bottom_right.x = tx;
+            bottom_right.y = ty + 1;
+            top_left.x = tx - 1;
+            top_left.y = ty;
+            top_right.x = tx;
+            top_right.y = ty;
+        }
+        if (area_row == 1 && area_col == 1) {
+            bottom_left.x = tx;
+            bottom_left.y = ty + 1;
+            bottom_right.x = tx + 1;
+            bottom_right.y = ty + 1;
+            top_left.x = tx;
+            top_left.y = ty;
+            top_right.x = tx + 1;
+            top_right.y = ty;
+        }
+        Vector2D center_bottom_left = bottom_left + Vector2D(0.5, 0.5);
+//        Vector2D center_bottom_right = bottom_right + Vector2D(0.5, 0.5);
+//        Vector2D center_top_left = top_left + Vector2D(0.5, 0.5);
+//        Vector2D center_top_right = top_right + Vector2D(0.5, 0.5);
+        float r_s = (real_u - center_bottom_left.x);
+        Color c_bot = (1 - r_s) * mip.get_texel(int(bottom_left.x), int(bottom_left.y))
+                      + r_s * mip.get_texel(int(bottom_right.x), int(bottom_right.y));
+        Color c_top = (1 - r_s) * mip.get_texel(int(top_left.x), int(top_left.y))
+                      + r_s * mip.get_texel(int(top_right.x), int(top_right.y));
+        float r_t = (center_bottom_left.y - real_v);
+        Color result = c_bot * (1 - r_t) + c_top * r_t;
+        return result;
     }
-
-
 
     /****************************************************************************/
 
