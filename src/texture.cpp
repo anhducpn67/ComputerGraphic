@@ -14,12 +14,15 @@ namespace CGL {
             }
             float level = get_level(sp);
             if (sp.lsm == L_NEAREST) {
-                return sample_nearest(sp.p_uv, int(level));
+                int real_level = min(int(level), int(mipmap.size()) - 1);
+                return sample_nearest(sp.p_uv, real_level);
             }
             if (sp.lsm == L_LINEAR) {
                 int level1 = int(level);
                 int level2 = int(level) + 1;
                 float weight = level - level1;
+                level1 = min(level1, int(mipmap.size()) - 1);
+                level2 = min(level2, int(mipmap.size()) - 1);
                 return (1 - weight)*sample_nearest(sp.p_uv, level1) + weight*sample_nearest(sp.p_uv, level2);
             }
         }
@@ -29,12 +32,15 @@ namespace CGL {
             }
             float level = get_level(sp);
             if (sp.lsm == L_NEAREST) {
-                return sample_bilinear(sp.p_uv, int(level));
+                int real_level = min(int(level), int(mipmap.size()) - 1);
+                return sample_bilinear(sp.p_uv, real_level);
             }
             if (sp.lsm == L_LINEAR) {
                 int level1 = int(level);
                 int level2 = int(level) + 1;
                 float weight = level - level1;
+                level1 = min(level1, int(mipmap.size()) - 1);
+                level2 = min(level2, int(mipmap.size()) - 1);
                 return (1 - weight)*sample_bilinear(sp.p_uv, level1) + weight*sample_bilinear(sp.p_uv, level2);
             }
         }

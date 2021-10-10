@@ -13,3 +13,4 @@ xcode
 build-dbg/
 *.swp
 *.json
+/docs/
